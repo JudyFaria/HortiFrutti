@@ -1,0 +1,33 @@
+quero
+Abacate (kg) - R$ 9,99
+Maracujá Azedo (kg) - R$ 9,99
+Melão Amarelo (kg) - R$ 4,99
+Melancia (kg) - R$ 1,99
+Goiaba Vermelha (kg) - R$ 9,99
+Pera Williams (kg) - R$ 18,99
+Uva Verde sem Semente (bandeja 500g) - R$ 13,99
+Batata Lavada (kg) - R$ 3,99
+Batata Doce Roxa (kg) - R$ 6,99
+Cebola (kg) - R$ 3,79
+Cebola Roxa (kg) - R$ 5,99
+Cenoura (kg) - R$ 4,79
+Tomate Carmem (kg) - R$ 3,99
+Tomate Italiano (kg) - R$ 7,99
+Abobrinha Italiana (kg) - R$ 3,99
+Beterraba (kg) - R$ 4,99
+Chuchu (kg) - R$ 6,99
+Mandioca (kg) - R$ 3,99
+Mandioquinha (Salsa) (kg) - R$ 19,99
+Berinjela (kg) - R$ 9,99
+Pepino Japonês (kg) - R$ 4,99
+Pimentão Verde (kg) - R$ 19,99
+Abóbora Cambotiá (kg) - R$ 5,99
+Inhame (kg) - R$ 9,99
+Alho (kg) - R$ 19,90
+Alface Crespa (unidade) - R$ 2,99
+Alface Americana (unidade) - R$ 3,79
+Couve Manteiga (maço) - R$ 2,99
+Brócolis Chinês (unidade) - R$ 5,49
+Repolho Verde (unidade) - R$ 3,79
+Salsa (maço) - R$ 2,99
+Cebolinha Verde (maço) - R$ 2,99
