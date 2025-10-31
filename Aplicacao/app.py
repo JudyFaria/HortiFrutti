@@ -4,6 +4,10 @@ import platform # Para descobrir o sistema operacional
 import os
 import streamlit as st
 
+import tensorflow as tf
+import numpy as np
+from PIL import Image
+
 # --- 1. FUNÇÕES AUXILIARES DE PYTHON ---
 
 # Função para gerar a chave (primeira palavra, minúscula)
@@ -13,6 +17,61 @@ def gerar_chave(nome_completo):
     # Converte para minúscula e remove caracteres não-alfabéticos
     chave_limpa = "".join(c for c in chave if c.isalpha()).lower()
     return chave_limpa
+
+
+# Funções Auxiliares da IA
+MODELO_IA_PATH = "Treinamento/modelo_hortifrutti.keras"
+# -> classes na mesma ordem do treino, encontrada no log de treino
+CLASSES_DO_MODELO = ['banana', 'cebola', 'cenoura', 'maca']
+IMG_HEIGHT = 224
+IMG_WIDTH = 224
+
+@st.cache_resource
+def carregar_modelo_ia():
+    '''
+        Carrega o modelo de IA treinado uma única vez.
+    '''
+    print("LOG: Carregando modelo de IA...")
+
+    try:
+        model = tf.keras.models.load_model(MODELO_IA_PATH)
+        print("Modelo IA carregado com sucesso!")
+        return model
+    
+    except Exception as e:
+        st.error(f"**Erro ao carregar o modelo de IA ({MODELO_IA_PATH}):**\n\n{e}\n")
+        st.error("Verifique se o arquivo do modelo está na mesma pasta da aplicação")
+        st.stop()
+        return None
+    
+def processar_imagem_para_ia(imagem_upada):
+    '''
+        Converte a imagem do Streamlit para o formato que o modelo espera
+    '''
+    try:
+        img = Image.open(imagem_upada)
+        img = img.resize( (IMG_HEIGHT, IMG_WIDTH) ) # redimensiona
+
+        # converte para array numpy
+        img_array = np.array(img)
+
+        # Garante 3 canais (RGB), lidando com imagens P&B ou com transparência (RGBA)
+        if img_array.ndim == 2: # P&B
+            img_array = np.stack((img_array,)*3, axis=-1)
+
+        elif img_array.shape[2] == 4: # RGBA
+            img_array = img_array[:, :, :3]
+
+        # Expande a dimensão para criar um "lote" de 1 imagem
+        # Formato final: (1, 224, 224, 3)
+        img_array = np.expand_dims(img_array, axis=0)
+
+        return img_array
+    
+    except Exception as e:
+        st.error(f"Erro ao processar imagem: {e}")
+        return None
+    
 
 # --- 2. CONFIGURAÇÃO DO CTYPES (A "Ponte" C <-> Python) ---
 
@@ -75,15 +134,13 @@ except AttributeError as e:
 
 # --- 4. INICIALIZAÇÃO E CARGA (A NOVA FORMA) ---
 
-# @st.cache_resource garante que este bloco só rode UMA VEZ
-# e não a cada clique de botão.
+# @st.cache_resource garante que este bloco só rode UMA VEZ e não a cada clique de botão.
 @st.cache_resource
 def inicializar_e_carregar():
     print("LOG: Chamando inicializar_tabela() do C...")
     lib.inicializar_tabela()
 
-    # Registra a função de limpeza para ser chamada quando o
-    # servidor Streamlit for parado (com Ctrl+C)
+    # Registra a função de limpeza para ser chamada quando o servidor Streamlit for parado (com Ctrl+C)
     atexit.register(lib.liberar_tabela_api)
     print("LOG: Tabela C inicializada e 'atexit' registrado.")
 
@@ -117,14 +174,70 @@ def inicializar_e_carregar():
 
 # --- Executa a inicialização ---
 num_produtos = inicializar_e_carregar()
+modelo_ia = carregar_modelo_ia()
+
 st.success(f"Tabela Hash C carregada com {num_produtos} produtos do 'produtos.txt'.")
 
 
 # --- 5. APLICAÇÃO GRÁFICA (Streamlit) ---
 # Adeus, class AppHortifruti!
 
-st.title("🛒 Hortifruti (Python + C)")
-st.markdown("Interface Web com Streamlit controlando uma Tabela Hash em C.")
+st.title("🛒 Hortifruti (Python + C + IA)")
+st.markdown("Interface Web com Streamlit controlando uma Tabela Hash em C e IA (transfer learning).")
+
+# seção de busca por ia
+st.header("🤖 Buscar por Imagem (IA)")
+imagem_updata = st.file_uploader("Envie a foto de um produto", type=["jpg", "png", "jpeg"])
+
+if imagem_updata is not None:
+
+    # mostra a imagem 
+    st.image(imagem_updata, caption="Imagem enviada", use_column_width=True)
+
+    # Processa a imagem
+    array_imagem = processar_imagem_para_ia(imagem_updata)
+
+    if (array_imagem is not None):
+
+        # faz predição da IA
+        predicao = modelo_ia.predict(array_imagem)
+
+        # converte a predição em nome
+        # (predicao[0] é a lista de probabilidades) np.argmax encontra o índice da maior probabilidade
+        indice_predito = np.argmax(predicao[0])
+        chave_str_ia = CLASSES_DO_MODELO[indice_predito]
+        confianca = 100 * np.max(predicao[0])
+
+        st.subheader(f"IA identificou: '{chave_str_ia}")
+        st.info(f"Confiança da IA: {confianca:.2f}%")
+
+        # Usa a chave da IA para a busca na tabela Hash
+        st.write(f"--- Buscando '{chave_str_ia}' na Tabela Hash C... ---")
+        chave_c = chave_str_ia.encode('utf-8')
+        ponteiro_lista = lib.buscar_prod_api(chave_c)
+
+        if not ponteiro_lista:
+            st.error(f"Produto '{chave_str_ia}' identificado pela IA, mas não encontrado na tabela")
+
+        else:
+            # Percorre a lista ligada vinda do C
+            atual = ponteiro_lista
+            count = 0
+            while atual:
+                produto = atual.contents.produto
+                
+                nome_py = produto.nome.decode('utf-8')
+                preco_py = produto.preco
+                
+                # st.write é o novo "print" para a tela
+                st.write(f" -> **{nome_py}** - R${preco_py:.2f}")
+                
+                atual = atual.contents.proximo
+                count += 1
+            st.write(f"({count} resultado(s) encontrado(s))")
+
+        st.write("--- Fim da busca por IA ---")
+
 
 # --- Frame de Adição (Usando um expander e um formulário) ---
 with st.expander("Adicionar Novo Produto"):
